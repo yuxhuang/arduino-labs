@@ -17,8 +17,9 @@
 #define ADAFRUIT_CC3000_CS    10
 // Use hardware SPI for the remaining pins
 // On an UNO, SCK = 13, MISO = 12, and MOSI = 11
-Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ, ADAFRUIT_CC3000_VBAT,
-                                         SPI_CLOCK_DIVIDER); // you can change this clock speed but DI
+Adafruit_CC3000 *cc3000; // you can change this clock speed but DI
+                                         
+Adafruit_CC3000_Client client;
                                          
 #define CONNECTION_TIMEOUT (15L * 1000L)
 
@@ -28,8 +29,8 @@ Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ
 #define WLAN_SECURITY   WLAN_SEC_WPA2
 
 // sensors
-Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085);
-Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345);
+Adafruit_BMP085_Unified *bmp;
+Adafruit_TSL2561_Unified *tsl;
 
 
 /**************************************************************************/
@@ -39,7 +40,7 @@ Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 1234
 /**************************************************************************/
 void setup(void) 
 {
-  Serial.begin(115200);
+  Serial.begin(9600);
   if (!Serial)
   {
     while(1);
@@ -50,9 +51,6 @@ void setup(void)
   configure_bmp();
   configure_tsl();
   
-  // configure wifi
-  configure_cc3000();
-    
   /* We're ready to go! */
   Serial.println("");
 }
@@ -65,26 +63,15 @@ void setup(void)
 /**************************************************************************/
 static void configure_bmp(void)
 {
+  bmp = new Adafruit_BMP085_Unified(10085);
+  
   /* Initialise the sensor */
-  if(!bmp.begin())
+  if(!bmp->begin())
   {
     /* There was a problem detecting the BMP085 ... check your connections */
     Serial.print("Ooops, no BMP085 detected ... Check your wiring or I2C ADDR!");
     while(1);
   }
-  
-//  sensor_t sensor;
-//  bmp.getSensor(&sensor);
-//  Serial.println("------------------------------------");
-//  Serial.print  ("Sensor:       "); Serial.println(sensor.name);
-//  Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
-//  Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
-//  Serial.print  ("Max Value:    "); Serial.print(sensor.max_value); Serial.println(" hPa");
-//  Serial.print  ("Min Value:    "); Serial.print(sensor.min_value); Serial.println(" hPa");
-//  Serial.print  ("Resolution:   "); Serial.print(sensor.resolution); Serial.println(" hPa");  
-//  Serial.println("------------------------------------");
-//  Serial.println("");
-//  delay(500);
 }
 
 /**************************************************************************/
@@ -94,35 +81,24 @@ static void configure_bmp(void)
 /**************************************************************************/
 static void configure_tsl(void)
 {
+  tsl = new Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345);
+  
   /* Initialise the sensor */
-  if(!tsl.begin())
+  if(!tsl->begin())
   {
     /* There was a problem detecting the ADXL345 ... check your connections */
     Serial.print("Ooops, no TSL2561 detected ... Check your wiring or I2C ADDR!");
     while(1);
   }
   
-//  sensor_t sensor;
-//  tsl.getSensor(&sensor);
-//  Serial.println("------------------------------------");
-//  Serial.print  ("Sensor:       "); Serial.println(sensor.name);
-//  Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
-//  Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
-//  Serial.print  ("Max Value:    "); Serial.print(sensor.max_value); Serial.println(" lux");
-//  Serial.print  ("Min Value:    "); Serial.print(sensor.min_value); Serial.println(" lux");
-//  Serial.print  ("Resolution:   "); Serial.print(sensor.resolution); Serial.println(" lux");  
-//  Serial.println("------------------------------------");
-//  Serial.println("");
-//  delay(500);
-  
   /* You can also manually set the gain or enable auto-gain support */
   // tsl.setGain(TSL2561_GAIN_1X);      /* No gain ... use in bright light to avoid sensor saturation */
   // tsl.setGain(TSL2561_GAIN_16X);     /* 16x gain ... use in low light to boost sensitivity */
-  tsl.enableAutoRange(true);            /* Auto-gain ... switches automatically between 1x and 16x */
+  tsl->enableAutoRange(true);            /* Auto-gain ... switches automatically between 1x and 16x */
   
   /* Changing the integration time gives you better sensor resolution (402ms = 16-bit data) */
 //  tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS);      /* fast but low resolution */
-    tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  /* medium resolution and speed   */
+    tsl->setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  /* medium resolution and speed   */
 //  tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  /* 16-bit data but slowest conversions */
 
   /* Update these values depending on what you've set above! */
@@ -135,32 +111,20 @@ static void configure_tsl(void)
 
 static void configure_cc3000(void)
 {
+  cc3000 = new Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ, ADAFRUIT_CC3000_VBAT,
+                                         SPI_CLOCK_DIVIDER);
+  
   /* Initialise the module */
   Serial.println(F("\nInitialising the CC3000 ..."));
-  if (!cc3000.begin())
+  if (!cc3000->begin())
   {
     Serial.println(F("Unable to initialise the CC3000! Check your wiring?"));
     while(1);
   }
   
-  cc3000_displayDriverMode();
-  
-  uint16_t firmware = cc3000_checkFirmwareVersion();
-  if (firmware < 0x113) {
-    Serial.println(F("Wrong firmware version!"));
-    for(;;);
-  }
-  
-  cc3000_displayMACAddress();
-  
-  /* Optional: Get the SSID list (not available in 'tiny' mode) */
-//#ifndef CC3000_TINY_DRIVER
-//  cc3000_listSSIDResults();
-//#endif
-
   /* Delete any old connection data on the module */
   Serial.println(F("\nDeleting old connection profiles"));
-  if (!cc3000.deleteProfiles()) {
+  if (!cc3000->deleteProfiles()) {
     Serial.println(F("Failed!"));
     while(1);
   }
@@ -170,7 +134,7 @@ static void configure_cc3000(void)
   Serial.print(F("\nAttempting to connect to ")); Serial.println(ssid);
   
   /* NOTE: Secure connections are not available in 'Tiny' mode! */
-  if (!cc3000.connectToAP(WLAN_SSID, WLAN_PASS, WLAN_SECURITY)) {
+  if (!cc3000->connectToAP(WLAN_SSID, WLAN_PASS, WLAN_SECURITY)) {
     Serial.println(F("Failed!"));
     while(1);
   }
@@ -179,7 +143,7 @@ static void configure_cc3000(void)
   
   /* Wait for DHCP to complete */
   Serial.println(F("Request DHCP"));
-  while (!cc3000.checkDHCP())
+  while (!cc3000->checkDHCP())
   {
     delay(100); // ToDo: Insert a DHCP timeout!
   } 
@@ -189,113 +153,21 @@ static void configure_cc3000(void)
     delay(1000);
   }
   
-  /* You need to make sure to clean up after yourself or the CC3000 can freak out */
-  /* the next time you try to connect ... */
-//  Serial.println(F("\n\nClosing the connection"));
-//  cc3000.disconnect();  
-}
-
-/**************************************************************************/
-/*!
-    @brief  Displays the driver mode (tiny of normal), and the buffer
-            size if tiny mode is not being used
-
-    @note   The buffer size and driver mode are defined in cc3000_common.h
-*/
-/**************************************************************************/
-static void cc3000_displayDriverMode(void)
-{
-  #ifdef CC3000_TINY_DRIVER
-    Serial.println(F("CC3000 is configure in 'Tiny' mode"));
-  #else
-    Serial.print(F("RX Buffer : "));
-    Serial.print(CC3000_RX_BUFFER_SIZE);
-    Serial.println(F(" bytes"));
-    Serial.print(F("TX Buffer : "));
-    Serial.print(CC3000_TX_BUFFER_SIZE);
-    Serial.println(F(" bytes"));
-  #endif
-}
-
-/**************************************************************************/
-/*!
-    @brief  Tries to read the CC3000's internal firmware patch ID
-*/
-/**************************************************************************/
-uint16_t cc3000_checkFirmwareVersion(void)
-{
-  uint8_t major, minor;
-  uint16_t version;
+  Serial.println(F("Attempting connection..."));
   
-#ifndef CC3000_TINY_DRIVER  
-  if(!cc3000.getFirmwareVersion(&major, &minor))
-  {
-    Serial.println(F("Unable to retrieve the firmware version!\r\n"));
-    version = 0;
-  }
-  else
-  {
-    Serial.print(F("Firmware V. : "));
-    Serial.print(major); Serial.print(F(".")); Serial.println(minor);
-    version = major; version <<= 8; version |= minor;
-  }
-#endif
-  return version;
-}
-
-/**************************************************************************/
-/*!
-    @brief  Tries to read the 6-byte MAC address of the CC3000 module
-*/
-/**************************************************************************/
-void cc3000_displayMACAddress(void)
-{
-  uint8_t macAddress[6];
+  // connect to UDP
+  unsigned long ip = cc3000->IP2U32(239, 0, 100, 1),
+    curTime,
+    startTime = millis();
   
-  if(!cc3000.getMacAddress(macAddress))
-  {
-    Serial.println(F("Unable to retrieve MAC Address!\r\n"));
+  do {
+    client = cc3000->connectUDP(ip, 5354);
+    curTime = millis();
+  } while (!client.connected() && (curTime - startTime) < CONNECTION_TIMEOUT);
+  
+  if (curTime - startTime >= CONNECTION_TIMEOUT) {
+    Serial.println(F("Connection timeout."));
   }
-  else
-  {
-    Serial.print(F("MAC Address : "));
-    cc3000.printHex((byte*)&macAddress, 6);
-  }
-}
-
-
-/**************************************************************************/
-/*!
-    @brief  Begins an SSID scan and prints out all the visible networks
-*/
-/**************************************************************************/
-
-static void cc3000_listSSIDResults(void)
-{
-  uint8_t valid, rssi, sec, index;
-  char ssidname[33]; 
-
-  index = cc3000.startSSIDscan();
-
-  Serial.print(F("Networks found: ")); Serial.println(index);
-  Serial.println(F("================================================"));
-
-  while (index) {
-    index--;
-
-    valid = cc3000.getNextSSID(&rssi, &sec, ssidname);
-    
-    Serial.print(F("SSID Name    : ")); Serial.print(ssidname);
-    Serial.println();
-    Serial.print(F("RSSI         : "));
-    Serial.println(rssi);
-    Serial.print(F("Security Mode: "));
-    Serial.println(sec);
-    Serial.println();
-  }
-  Serial.println(F("================================================"));
-
-  cc3000.stopSSIDscan();
 }
 
 /**************************************************************************/
@@ -307,22 +179,26 @@ bool cc3000_displayConnectionDetails(void)
 {
   uint32_t ipAddress, netmask, gateway, dhcpserv, dnsserv;
   
-  if(!cc3000.getIPAddress(&ipAddress, &netmask, &gateway, &dhcpserv, &dnsserv))
+  if(!cc3000->getIPAddress(&ipAddress, &netmask, &gateway, &dhcpserv, &dnsserv))
   {
     Serial.println(F("Unable to retrieve the IP Address!\r\n"));
     return false;
   }
   else
   {
-    Serial.print(F("\nIP Addr: ")); cc3000.printIPdotsRev(ipAddress);
-    Serial.print(F("\nNetmask: ")); cc3000.printIPdotsRev(netmask);
-    Serial.print(F("\nGateway: ")); cc3000.printIPdotsRev(gateway);
-    Serial.print(F("\nDHCPsrv: ")); cc3000.printIPdotsRev(dhcpserv);
-    Serial.print(F("\nDNSserv: ")); cc3000.printIPdotsRev(dnsserv);
+    Serial.print(F("\nIP Addr: ")); cc3000->printIPdotsRev(ipAddress);
+    Serial.print(F("\nNetmask: ")); cc3000->printIPdotsRev(netmask);
+    Serial.print(F("\nGateway: ")); cc3000->printIPdotsRev(gateway);
+    Serial.print(F("\nDHCPsrv: ")); cc3000->printIPdotsRev(dhcpserv);
+    Serial.print(F("\nDNSserv: ")); cc3000->printIPdotsRev(dnsserv);
     Serial.println();
     return true;
   }
 }
+
+
+#define RESET_WIFI_COUNT 100
+int count = 1;
 
 /**************************************************************************/
 /*
@@ -332,9 +208,25 @@ bool cc3000_displayConnectionDetails(void)
 /**************************************************************************/
 void loop(void) 
 {
+  if (count == 1) {
+    configure_cc3000();
+  }
+  
   acquireBmpEvent();
   acquireTslEvent();
+  
   cc3000_send_multicast();
+  
+  // reset wifi every 100 count.
+  
+  if (count >= RESET_WIFI_COUNT) {
+    cc3000->disconnect();
+    delete cc3000;
+    count = 0;
+  }
+  
+  count ++;
+  
   delay(1618);
 }
 
@@ -344,7 +236,7 @@ static sensors_event_t tslEvent;
 static void acquireBmpEvent() {
   /* BMP */
   
-  bmp.getEvent(&bmpEvent);
+  bmp->getEvent(&bmpEvent);
  
   /* Display the results (barometric pressure is measure in hPa) */
   if (bmpEvent.pressure)
@@ -371,7 +263,7 @@ static void acquireBmpEvent() {
      
     /* First we get the current temperature from the BMP085 */
     float temperature;
-    bmp.getTemperature(&temperature);
+    bmp->getTemperature(&temperature);
     Serial.print("Temperature: ");
     Serial.print(temperature);
     Serial.println(" C");
@@ -384,7 +276,7 @@ static void acquireBmpEvent() {
 
 static void acquireTslEvent() {
   /* TSL */
-  tsl.getEvent(&tslEvent);
+  tsl->getEvent(&tslEvent);
  
   /* Display the results (light is measured in lux) */
   if (tslEvent.light)
@@ -397,7 +289,6 @@ static void acquireTslEvent() {
        and no reliable data could be generated! */
     Serial.println("Light sensor overload");
   }
-  
 }
 
 static void cc3000_send_multicast(void)
@@ -406,7 +297,7 @@ static void cc3000_send_multicast(void)
   
   packet->items[0].type = BUMBLE_SENSOR_TYPE_TEMPERATURE;
   packet->items[0].data_type = BUMBLE_ITEM_FLOAT;
-  bmp.getTemperature(&(packet->items[0].data.f));
+  bmp->getTemperature(&(packet->items[0].data.f));
   
   packet->items[1].type = BUMBLE_SENSOR_TYPE_BAROMETRIC;
   packet->items[1].data_type = BUMBLE_ITEM_FLOAT;
@@ -416,26 +307,15 @@ static void cc3000_send_multicast(void)
   packet->items[2].data_type = BUMBLE_ITEM_FLOAT;
   packet->items[2].data.f = tslEvent.light;
   
-  Serial.println(F("Attempting connection..."));
-  
-  // connect to UDP
-  Adafruit_CC3000_Client client;
-  unsigned long ip = cc3000.IP2U32(239, 0, 100, 1),
-    startTime = millis();
-  
-  do {
-    client = cc3000.connectUDP(ip, 5354);
-  } while (!client.connected() && (millis() - startTime) < CONNECTION_TIMEOUT);
-  
   if (client.connected()) {
-    Serial.println(F("connected! Sending out packet..."));
-    
     // assemble and send packet
     size_t packet_size = sizeof_bumble_packet(packet);
     client.write(packet, packet_size, 0);
     
     Serial.println(F("Packet sent!"));
-    client.close();
+  }
+  else {
+    Serial.println(F("Sent failed!"));
   }
   
   destroy_bumble_packet(packet);
