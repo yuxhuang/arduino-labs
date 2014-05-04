@@ -8,6 +8,8 @@
 #include <SPI.h>
 #include <string.h>
 
+#include <bumble_proto.h>
+
 // These are the interrupt and control pins
 #define ADAFRUIT_CC3000_IRQ   3  // MUST be an interrupt pin!
 // These can be any two pins
@@ -17,6 +19,8 @@
 // On an UNO, SCK = 13, MISO = 12, and MOSI = 11
 Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ, ADAFRUIT_CC3000_VBAT,
                                          SPI_CLOCK_DIVIDER); // you can change this clock speed but DI
+                                         
+#define CONNECTION_TIMEOUT (15L * 1000L)
 
 #define WLAN_SSID       ""        // cannot be longer than 32 characters!
 #define WLAN_PASS       ""
@@ -187,8 +191,8 @@ static void configure_cc3000(void)
   
   /* You need to make sure to clean up after yourself or the CC3000 can freak out */
   /* the next time you try to connect ... */
-  Serial.println(F("\n\nClosing the connection"));
-  cc3000.disconnect();  
+//  Serial.println(F("\n\nClosing the connection"));
+//  cc3000.disconnect();  
 }
 
 /**************************************************************************/
@@ -266,33 +270,33 @@ void cc3000_displayMACAddress(void)
 */
 /**************************************************************************/
 
-//static void cc3000_listSSIDResults(void)
-//{
-//  uint8_t valid, rssi, sec, index;
-//  char ssidname[33]; 
-//
-//  index = cc3000.startSSIDscan();
-//
-//  Serial.print(F("Networks found: ")); Serial.println(index);
-//  Serial.println(F("================================================"));
-//
-//  while (index) {
-//    index--;
-//
-//    valid = cc3000.getNextSSID(&rssi, &sec, ssidname);
-//    
-//    Serial.print(F("SSID Name    : ")); Serial.print(ssidname);
-//    Serial.println();
-//    Serial.print(F("RSSI         : "));
-//    Serial.println(rssi);
-//    Serial.print(F("Security Mode: "));
-//    Serial.println(sec);
-//    Serial.println();
-//  }
-//  Serial.println(F("================================================"));
-//
-//  cc3000.stopSSIDscan();
-//}
+static void cc3000_listSSIDResults(void)
+{
+  uint8_t valid, rssi, sec, index;
+  char ssidname[33]; 
+
+  index = cc3000.startSSIDscan();
+
+  Serial.print(F("Networks found: ")); Serial.println(index);
+  Serial.println(F("================================================"));
+
+  while (index) {
+    index--;
+
+    valid = cc3000.getNextSSID(&rssi, &sec, ssidname);
+    
+    Serial.print(F("SSID Name    : ")); Serial.print(ssidname);
+    Serial.println();
+    Serial.print(F("RSSI         : "));
+    Serial.println(rssi);
+    Serial.print(F("Security Mode: "));
+    Serial.println(sec);
+    Serial.println();
+  }
+  Serial.println(F("================================================"));
+
+  cc3000.stopSSIDscan();
+}
 
 /**************************************************************************/
 /*!
@@ -330,12 +334,14 @@ void loop(void)
 {
   acquireBmpEvent();
   acquireTslEvent();
+  cc3000_send_multicast();
   delay(1618);
 }
 
-static void acquireBmpEvent() {
-  sensors_event_t bmpEvent;
+static sensors_event_t bmpEvent;
+static sensors_event_t tslEvent;
 
+static void acquireBmpEvent() {
   /* BMP */
   
   bmp.getEvent(&bmpEvent);
@@ -377,10 +383,7 @@ static void acquireBmpEvent() {
 }
 
 static void acquireTslEvent() {
-  sensors_event_t tslEvent;
- 
   /* TSL */
-  
   tsl.getEvent(&tslEvent);
  
   /* Display the results (light is measured in lux) */
@@ -397,5 +400,43 @@ static void acquireTslEvent() {
   
 }
 
-
-
+static void cc3000_send_multicast(void)
+{
+  bumble_t *packet = create_bumble_packet(3);
+  
+  packet->items[0].type = BUMBLE_SENSOR_TYPE_TEMPERATURE;
+  packet->items[0].data_type = BUMBLE_ITEM_FLOAT;
+  bmp.getTemperature(&(packet->items[0].data.f));
+  
+  packet->items[1].type = BUMBLE_SENSOR_TYPE_BAROMETRIC;
+  packet->items[1].data_type = BUMBLE_ITEM_FLOAT;
+  packet->items[1].data.f = bmpEvent.pressure;
+  
+  packet->items[2].type = BUMBLE_SENSOR_TYPE_LUMINOSITY;
+  packet->items[2].data_type = BUMBLE_ITEM_FLOAT;
+  packet->items[2].data.f = tslEvent.light;
+  
+  Serial.println(F("Attempting connection..."));
+  
+  // connect to UDP
+  Adafruit_CC3000_Client client;
+  unsigned long ip = cc3000.IP2U32(239, 0, 100, 1),
+    startTime = millis();
+  
+  do {
+    client = cc3000.connectUDP(ip, 5354);
+  } while (!client.connected() && (millis() - startTime) < CONNECTION_TIMEOUT);
+  
+  if (client.connected()) {
+    Serial.println(F("connected! Sending out packet..."));
+    
+    // assemble and send packet
+    size_t packet_size = sizeof_bumble_packet(packet);
+    client.write(packet, packet_size, 0);
+    
+    Serial.println(F("Packet sent!"));
+    client.close();
+  }
+  
+  destroy_bumble_packet(packet);
+}
