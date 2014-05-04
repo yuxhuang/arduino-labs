@@ -13,3 +13,6 @@
 [submodule "libraries/Adafruit_TSL2561"]
 	path = libraries/Adafruit_TSL2561
 	url = https://github.com/adafruit/Adafruit_TSL2561.git
+[submodule "libraries/Adafruit_CC3000_Library"]
+	path = libraries/Adafruit_CC3000_Library
+	url = https://github.com/adafruit/Adafruit_CC3000_Library.git
