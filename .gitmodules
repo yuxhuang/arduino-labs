@@ -16,3 +16,6 @@
 [submodule "libraries/Adafruit_CC3000_Library"]
 	path = libraries/Adafruit_CC3000_Library
 	url = https://github.com/adafruit/Adafruit_CC3000_Library.git
+[submodule "libraries/Adafruit_nRF8001"]
+	path = libraries/Adafruit_nRF8001
+	url = https://github.com/adafruit/Adafruit_nRF8001.git
