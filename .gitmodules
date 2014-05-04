@@ -1,3 +1,15 @@
 [submodule "libraries/bumble"]
 	path = libraries/bumble
 	url = git@github.com:yuxhuang/bumble.git
+[submodule "libraries/Adafruit_BMP085_Unified"]
+	path = libraries/Adafruit_BMP085_Unified
+	url = https://github.com/adafruit/Adafruit_BMP085_Unified.git
+[submodule "libraries/Adafruit_Sensor"]
+	path = libraries/Adafruit_Sensor
+	url = https://github.com/adafruit/Adafruit_Sensor.git
+[submodule "libraries/Adafruit_DHT"]
+	path = libraries/Adafruit_DHT
+	url = https://github.com/adafruit/DHT-sensor-library.git
+[submodule "libraries/Adafruit_TSL2561"]
+	path = libraries/Adafruit_TSL2561
+	url = https://github.com/adafruit/Adafruit_TSL2561.git
