@@ -6,10 +6,11 @@
 #include <Adafruit_CC3000.h>
 #include <ccspi.h>
 #include <SPI.h>
+#include <DHT.h>
+
 #include <string.h>
 
 #include <bumble_proto.h>
-
 
 // These are the interrupt and control pins
 #define ADAFRUIT_CC3000_IRQ   3  // MUST be an interrupt pin!
@@ -30,10 +31,16 @@ Adafruit_CC3000_Client client;
 // Security can be WLAN_SEC_UNSEC, WLAN_SEC_WEP, WLAN_SEC_WPA or WLAN_SEC_WPA2
 #define WLAN_SECURITY   WLAN_SEC_WPA2
 
-// sensorsjjj
+// sensors
 Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085);
 Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345);
 
+// DHT sensor
+
+#define DHTPIN           2
+#define DHTTYPE          DHT22
+
+DHT dht(DHTPIN, DHTTYPE);
 
 /**************************************************************************/
 /*
@@ -52,6 +59,7 @@ void setup(void)
   
   configure_bmp();
   configure_tsl();
+  configure_dht();
   
   /* We're ready to go! */
   Serial.println("");
@@ -105,6 +113,11 @@ static void configure_tsl(void)
   Serial.print  (F("Gain:         ")); Serial.println(F("Auto"));
   Serial.print  (F("Timing:       ")); Serial.println(F("101 ms"));
   Serial.println(F("------------------------------------"));
+}
+
+static void configure_dht()
+{
+  dht.begin();
 }
 
 static void configure_cc3000(void)
@@ -280,7 +293,16 @@ static void acquireTslEvent() {
   }
 }
 
-bumble_t *packet = create_bumble_packet(3);
+static void acquireDht(float *t, float *h) {
+  *h = dht.readHumidity();
+  *t = dht.readTemperature();
+  
+  Serial.println(F("DHT:"));
+  Serial.print  (F("Temperature: ")); Serial.print(*t); Serial.println(F(" C"));
+  Serial.print  (F("Humidity   : ")); Serial.print(*h); Serial.println(F(" %"));
+}
+
+bumble_t *packet = create_bumble_packet(5);
 
 static void cc3000_send_multicast(void)
 {
@@ -296,6 +318,14 @@ static void cc3000_send_multicast(void)
   packet->items[2].type = BUMBLE_SENSOR_TYPE_LUMINOSITY;
   packet->items[2].data_type = BUMBLE_ITEM_FLOAT;
   packet->items[2].data.f = tslEvent.light;
+  
+  packet->items[3].type = BUMBLE_SENSOR_TYPE_TEMPERATURE;
+  packet->items[3].data_type = BUMBLE_ITEM_FLOAT;
+
+  packet->items[4].type = BUMBLE_SENSOR_TYPE_HUMIDITY;
+  packet->items[4].data_type = BUMBLE_ITEM_FLOAT;
+  
+  acquireDht(&(packet->items[3].data.f), &(packet->items[4].data.f));
   
   if (client.connected()) {
     // assemble and send packet
