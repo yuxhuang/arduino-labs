@@ -229,7 +229,7 @@ void loop(void)
   client.close();
   cc3000.disconnect();
   
-  delay(60000);
+  delay(30000);
 }
 
 static sensors_event_t bmpEvent;
